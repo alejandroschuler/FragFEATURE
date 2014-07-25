@@ -1,0 +1,2 @@
+types = ['ALA.CB', 'ASN.PSEU', 'GLU.PSEU', 'ILE.CB', 'LYS.NZ', 'PRO.PSEU', 'RES.O', 'THR.OG1', 'TRP.PSEU', 'TYR.PSEU', 'ARG.CZ', 'ASP.PSEU', 'CYS.SG', 'GLN.PSEU', 'HIS.PSEU', 'LEU.CB', 'MET.SD', 'PHE.PSEU', 'RES.N', 'SER.OG', 'TRP.NE1', 'TYR.OH', 'VAL.CB']
+
