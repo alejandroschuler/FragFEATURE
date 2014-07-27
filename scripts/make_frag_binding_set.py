@@ -6,7 +6,7 @@ import cPickle as pickle
 #print KB_HOME
 #print FragFEATURE_HOME
 
-querry_frag_num = 8027
+querry_frag_num = 8027`
 micros_who_bind_querry = {}
 
 for resatm in types:
@@ -34,5 +34,7 @@ outfile_txt.write(str(micros_who_bind_querry))
 outfile_txt.close()
 
 #note that in these files, a reference to microenv #0 means line #1, etc. Everything starts from 0.
+
+### this code has been verified manually by looking at lines 0:9 of PHE.PSEU.ALL.boundfrags
 
 print 'DING!'
