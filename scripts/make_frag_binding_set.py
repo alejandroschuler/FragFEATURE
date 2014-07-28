@@ -23,14 +23,16 @@ def main(querry_frag_string):
 
 ### STORE THE FRAGMENT-BINDING SET ### 
 
-    outfile_pvar = 'micros_who_bind_' + str(querry_frag_num) + '.pvar'
+    outfile = KB_HOME + '/micros_who_bind_' + str(querry_frag_num) 
+    
+    outfile_pvar = outfile + '.pvar'
     outfile_pvar = open(outfile_pvar, 'w')
     pickle.dump(micros_who_bind_querry, outfile_pvar)
     outfile_pvar.close()
 
 ### WRITE TO CSV FILE ###
 
-    outfile_txt = 'micros_who_bind_' + str(querry_frag_num) + '.txt'
+    outfile_txt = outfile + '.txt'
     outfile_txt = open(outfile_txt, 'w')
     outfile_txt.write(str(micros_who_bind_querry))
     outfile_txt.close()

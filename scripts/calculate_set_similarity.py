@@ -7,28 +7,27 @@ def calc_set_sim(micros_who_bind_querry):
 #micros_who_bind_querry is a dictionary with residue atom types as keys and lists of the line numbers of all that type of residue that are known to bind the fragment as values
 
 # ASSUMES THAT THE SET DECTIONARY IS LOADED ALREADY
-
     for resatm in micros_who_bind_querry.keys():
+        
+        # Load the clusters for the type
+        resatm_clusters = load_resatm_clusters(resatm)
         # Load ff vectors for all micros of the type resatm
-        resatmKB = load_resatm_KB_prop(resatm) #I think this imports numpy
-
+        resatmKB = load_resatm_KB_prop(resatm)
         # Remove the vectors for the micros that don't bind our querry fragment
+        # note that now the line number is a local ID, to get the global ID, need to do:
+        # micros_who_bind_querry[resatm][localID]
         set_ff = resatmKB[micros_who_bind_querry[resatm],:]
-
         # Load the pre-calculated standard deviation to use for bit conversion
-        # for Residue.Atom
         stdev = load_resatm_stdev(resatm)
-
-	# Keep just the non-zero variance features
+	    # Keep just the non-zero variance features
         set_ff = set_ff[:,(stdev != 0)]
         non0stdev = stdev[stdev != 0]
         
         for local_micro_num, micro_ff in enumerate(set_ff):
             # Calculate dissimilarity to Residue.Atom knowledge base (KB)
             micro_to_micro_sim_vec = dissimilarity_to_KB(micro_ff, set_ff, non0stdev)
-            micro_to_micro_sim_vec = homo_filter(micro_to_micro_sim_vec)
+            micro_to_micro_sim_vec = homo_filter(micro_to_micro_sim_vec, resatm)
             micro_to_set_sim[resatm][local_micro_num] = set_score(micro_to_micro_sim_vec)
 
-def homo_filter(T)
+def load_resatm_clusters(resatm)
     
-

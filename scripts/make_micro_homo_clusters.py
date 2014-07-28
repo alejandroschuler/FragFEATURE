@@ -8,9 +8,10 @@ def main():
     prot_clusters = load_seqclusterid('95') 
     print 'File loaded'
     micro_clusters = cluster_micros(prot_clusters)
-    outfile = 'micro_clusters.pvar'
-    outfile = open(outfile,'w')
-    pickle.dump(micro_clusters, outfile)
+    for resatm in types:
+        outfile = '%s/%s/%s.micro_clusters.pvar' % (KB_HOME, resatm, resatm)
+        outfile = open(outfile,'w')
+        pickle.dump(micro_clusters[resatm], outfile)
 
     return
 
