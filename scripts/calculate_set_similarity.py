@@ -38,6 +38,12 @@ def calc_set_sim(micros_who_bind_querry):
 
 #############################################################################3#
 
+def set_score(T):
+    
+
+
+#############################################################################3#
+
 def load_resatm_clusters(resatm):
    
     clusterfile = '%s/%s/%s.micro_clusters.pvar' % (KB_HOME, resatm, resatm)
