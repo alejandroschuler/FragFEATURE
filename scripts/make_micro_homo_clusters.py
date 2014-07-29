@@ -32,24 +32,21 @@ def cluster_micros(dict_by_tag):
 
     micro_clusters = {}
     for resatm in types:
-        type_clusters = {}
+        micro_to_cluster = {}
         anndata = load_resatm_KB_ann(resatm)
         print "loaded annotations for %s" % (resatm)
-        for micro_num, micro_ann in enumerate(anndata):
+        for micro_ID, micro_ann in enumerate(anndata):
             # look up the protein the micro belongs to with micro.tag
             # then look up the cluster that protein belongs to
             try:
-                clusterID = dict_by_tag[micro_ann.tag] 
-                #print "%s %s with tag %s belongs to cluster %s" % (resatm, str(micro_num), micro_ann.tag, str(clusterID))
-                if clusterID not in type_clusters:
-                    #assign the micro line number to the cluster
-                    type_clusters[clusterID] = [micro_num]
-                else:
-                    type_clusters[clusterID].append(micro_num)
+                cluster_ID = dict_by_tag[micro_ann.tag] 
+                # print "%s %s with tag %s belongs to cluster %s" % (resatm, str(micro_num), micro_ann.tag, str(clusterID))
+                micro_to_cluster[micro_ID] = cluster_ID
             except KeyError:
-                print "%s %s with tag %s has no cluster" % (resatm, str(micro_num), micro_ann.tag)
+                pass
+                # print "%s %s with tag %s has no cluster" % (resatm, str(micro_num), micro_ann.tag)
         # put the dictionary for this micro type into the master dictionary
-        micro_clusters[resatm] = type_clusters
+        micro_clusters[resatm] = micro_to_cluster
 
     return micro_clusters
 
