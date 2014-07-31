@@ -59,7 +59,7 @@ def within_set_sim(micros_who_bind_querry):
             print '---------------------------------- %s : %d : %d -----------------------------------\n' % (resatm, resatm_ID_set[candidate_index], candidate_index)
             # Calculate dissimilarity to Residue.Atom knowledge base (KB)
             print 'Calculating Tanimoto scores for microenvironment %d...' % (candidate_index)
-            T_vec = dissimilarity_to_KB(candidate_ff, set_ff, non0stdev)
+            T_vec = tanimoto_vec(candidate_ff, set_ff, non0stdev)
             print '%d scores calculated.' % (len(T_vec))
             print 'min \t mean \t max'
             print '%.3f \t %.3f \t %.3f' % (min(T_vec), np.mean(T_vec), max(T_vec))
@@ -86,7 +86,16 @@ def within_set_sim(micros_who_bind_querry):
 #############################################################################3#
 
 def set_score(T):
-    J = sci.logsumexp(T)
+    b = 10000000
+    k = 1.5
+    
+    result = map(lambda x: b**x, T)
+    result = sum(result)
+    result = np.log(result)
+    result = result - np.log(len(T))
+    result = result/np.log(b)
+    J = result**k
+    # J = (((np.log(sum(map(lambda x: b**x, T)))) - np.log(len(T)))/np.log(b)) ** k 
     
     return J
 
@@ -106,35 +115,41 @@ def homo_filter(T_dict, clusters):
 # T_dict is a dictionary--  micro_ID : T(m*,micro(ID))
 # clusters is a dictionary-- micro_ID : cluster_ID 
 
-    cluster_subsets = {}
+    best_score_in_cluster = {}
     singletons = []
     # Break up T_dict into disjoint subsets by homology cluster (and the homeless singletons)
     for micro_ID, score in T_dict.iteritems():
-        if micro_ID in clusters.keys():
+        try:
             cluster_ID = clusters[micro_ID]
-            if cluster_ID not in cluster_subsets:
-                cluster_subsets[cluster_ID] = [score]
+            if cluster_ID not in best_score_in_cluster:
+                # This is the first score analyzed that is from this cluster, so it is the max so far
+                best_score_in_cluster[cluster_ID] = score
+#                print '%.3f is the first score in cluster %d' % (score, cluster_ID)
             else:
-                cluster_subsets[cluster_ID].append(score)
-            # print 'Micro %d (scored at %.2f) added to cluster %d' % (micro_ID, score, cluster_ID)
-        else: 
+                # Compare current score to old max, replace old max if new score is better
+                best_score_in_cluster[cluster_ID] = max(best_score_in_cluster[cluster_ID], score)
+#                print 'A CHALLENGER APPEARS: %.3f is the best score in cluster %d' % (best_score_in_cluster[cluster_ID], cluster_ID)
+        except KeyError: 
             singletons.append(score)
-            # print 'Micro %d (scored at %.2f) has no cluster' % (micro_ID, score)
+#            print 'Micro %d (scored at %.2f) has no cluster' % (micro_ID, score)
 
-    # Find the top score in each cluster, toss the rest, since they are not independent votes
-    top_score_from_each_cluster = []
-    # print '\n\nclust \t best \t scores'
-    for cluster_ID, scores in cluster_subsets.iteritems():
-        top_score = max(scores)
-        top_score_from_each_cluster.append(top_score)
-        # print '%d \t %.3f \t %s' % (cluster_ID, top_score, str(scores))
-    
     # print '\n\n  #Clusters Represented: %d \t #Singletons: %d \n' % (
     #    len(cluster_subsets), len(singletons))
     # print 'Total Microenvironments: %d' % (len(T_dict))
-    T_filtered = top_score_from_each_cluster + singletons
+    T_filtered = best_score_in_cluster.values() + singletons
 
     return T_filtered
+
+#############################################################################3#
+
+def tanimoto_vec(candidate_ff, set_ff, non0stdev):
+# This is just a wrapper for dis.to.kb, but maps the output: [10000,0] -> [0,1]
+
+    T = dissimilarity_to_KB(candidate_ff, set_ff, non0stdev)
+    T = T.astype(float)
+    T = (10000 - T)/10000
+
+    return T
 
 #############################################################################3#
 
