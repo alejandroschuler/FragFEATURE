@@ -1,84 +1,102 @@
 import cPickle as pickle
 import numpy  as np
 import scipy.misc as sci
+import random
 from load_datafiles import load_resatm_KB_prop, load_resatm_stdev
 from supportingcode import dissimilarity_to_KB
 from load_directorypaths import *
 
-def main(querry_ID_string):
+def main(querry_ID_string, test_resatms=[], test_num=0):
 
     infile = '%s/micros_who_bind_%s.pvar' % (KB_HOME, querry_ID_string)    
     infile = open(infile, 'r')
     micros_who_bind_querry = pickle.load(infile)
-    J = within_set_sim(micros_who_bind_querry)
 
-    outfile = '%s/intra_set_inclusion_scores_%s' %(KB_HOME, querry_ID_string)
-    outfile = open(outfile, 'w')
-    pickle.dump(J, outfile)
+    J = within_set_sim(micros_who_bind_querry, test_resatms, test_num)
+
+    #outfile = '%s/intra_set_inclusion_scores_%s' %(KB_HOME, querry_ID_string)
+    #outfile = open(outfile, 'w')
+    #pickle.dump(J, outfile)
+    
+    return J
 
 #############################################################################3#
 
-def within_set_sim(micros_who_bind_querry):
+def within_set_sim(micros_who_bind_querry, test_resatms = [], test_num = 0):
 ### micros_who_bind_querry is a dictionary with residue atom types as keys 
 ### and lists of the line numbers of all that type of residue that are known 
 ### to bind the fragment as values
 
+    if test_resatms:
+        resatms = test_resatms
+    else:
+        resatms = micros_who_bind_querry.keys()
+
+    # initialize the set inclusion score resatm dictionary
     J_all_resatms = {}
 
-    for resatm in micros_who_bind_querry.keys():
-        
-        # Load the querry-binding set for the resatm type
-        print '\n\n################################### %s #####################################\n' % (resatm)
-        print 'Loading querry fragment binding set for %s...' % (resatm)
-        resatm_ID_set = micros_who_bind_querry[resatm]
-        print '%d querry-binding microenvironments loaded.\n' % (len(resatm_ID_set))
+    for resatm in resatms:
+        print '\n\n########################### %s ################################\n' % (resatm)
+
         # Load the clusters for the type
         print 'Loading microenvironment cluster set for %s...' % (resatm)
         resatm_clusters = load_resatm_clusters(resatm)
         print '%d microenvironment cluster mappings loaded.\n' % (len(resatm_clusters))
+        
         # Load ff vectors for all micros of the type resatm
         print 'Loading knowledgebase FragFEATURE vectors for %s...' % (resatm)
         resatmKB = load_resatm_KB_prop(resatm)
         print '%d microenvironment FragFEATURE vectors loaded.\n' % (len(resatmKB))
-        # Remove the vectors for the micros that don't bind our querry fragment
-        # note that now the line number is a local index, to get the global ID, need to do:
-        # resatm_ID_set[local_index]
-        print 'Subsetting FragFEATURE knowledgebase for fragment-binding microenvironments...'
-        set_ff = resatmKB[resatm_ID_set,:]
-        print '%d relevant FragFEATURE vectors retrieved.\n' % (len(set_ff))
+        
+        # Load the querry-binding set for the resatm type
+        print 'Loading querry fragment binding set for %s...' % (resatm)
+        resatm_ID_set = micros_who_bind_querry[resatm]
+        print '%d querry-binding microenvironments loaded.\n' % (len(resatm_ID_set))
+        
         # Load the pre-calculated standard deviation to use for bit conversion
         stdev = load_resatm_stdev(resatm)
-	    # Keep just the non-zero variance features
-        set_ff = set_ff[:,(stdev != 0)]
+        
+        # Remove the vectors for the micros that don't bind our querry fragment
+        # And just keep the non-zero variance features
+        print 'Subsetting FragFEATURE knowledgebase for fragment-binding microenvironments...'
+        frag_binding_set =({micro_ID : 
+                            resatmKB[micro_ID, stdev!=0].ravel().tolist()[0] 
+                            for micro_ID in resatm_ID_set})
+        print '%d relevant FragFEATURE vectors retrieved.\n' % (len(frag_binding_set))
         non0stdev = stdev[stdev != 0]
         
+        # Determine the candidates to compare to the frag binding set
+        if test_num != 0:
+            # only test a subset of candidates against the entire set
+            candidate_ID_set = random.sample(resatm_ID_set, min(test_num, len(resatm_ID_set)))
+            candidate_set = {candidate_ID : frag_binding_set[candidate_ID] for candidate_ID in candidate_ID_set}
+            print 'Will test the inclusion of %d candidates\n' % (len(candidate_set))
+        else:
+            candidate_set = frag_binding_set
+            print 'Will test the inclusion of entire frag-binding set (%d candidates)' % (len(candidate_set))
+        
+        # Initialize the set inclusion score vector      
         J_vec = []
 
-        for candidate_index, candidate_ff in enumerate(set_ff):
-
-            print '---------------------------------- %s : %d : %d -----------------------------------\n' % (resatm, resatm_ID_set[candidate_index], candidate_index)
+        for candidate_ID, candidate_ff in candidate_set.iteritems():
+            print '--------------------- %s : %d ---------------------\n' % (resatm, candidate_ID)
             # Calculate dissimilarity to Residue.Atom knowledge base (KB)
-            print 'Calculating Tanimoto scores for microenvironment %d...' % (candidate_index)
-            T_vec = tanimoto_vec(candidate_ff, set_ff, non0stdev)
-            print '%d scores calculated.' % (len(T_vec))
-            print 'min \t mean \t max'
-            print '%.3f \t %.3f \t %.3f' % (min(T_vec), np.mean(T_vec), max(T_vec))
-            # make a labeled dictionary that refers to resatm IDs
-            T_dict = {resatm_ID_set[i] : T_vec[i] for i in range(len(T_vec))}
+            print 'Calculating Tanimoto scores for microenvironment %d...' % (candidate_ID)
+            T_dict = tanimoto_dict(candidate_ff, frag_binding_set, non0stdev)
             # remove the (trivially=1) candidate "self-similarity" score
-            del T_dict[resatm_ID_set[candidate_index]]
+            del T_dict[candidate_ID]
             # Filter the vector for homology
             print 'Filtering the scores for homology...'
             T_filtered = homo_filter(T_dict, resatm_clusters)
             print 'Returned %d non-homologous scores.\n' % (len(T_filtered))
             print 'min \t mean \t max'
-            print '%.3f \t %.3f \t %.3f' % (min(T_filtered), np.mean(T_filtered), max(T_filtered))
+            print '%.3f \t %.3f \t %.3f\n' % (min(T_filtered), np.mean(T_filtered), max(T_filtered))
             # Calculate J-score (set buddy score)
             print 'Calculating set inclusion score...' 
             J_vec.append(set_score(T_filtered))
-            print 'J_%d = %.2f' % (candidate_index, J_vec[-1])
+            print 'J_%d = %.2f\n' % (candidate_ID, J_vec[-1])
 
-        print '%d set similarity scores calculated' % (len(J_vec))
+        print '\n\n %d set inclusion scores calculated for %s' % (len(J_vec), resatm)
         J_all_resatms[resatm] = J_vec
 
     return J_all_resatms
@@ -86,8 +104,8 @@ def within_set_sim(micros_who_bind_querry):
 #############################################################################3#
 
 def set_score(T):
-    b = 10000000
-    k = 1.5
+    b = 1000
+    k = 1
     
     result = map(lambda x: b**x, T)
     result = sum(result)
@@ -142,14 +160,21 @@ def homo_filter(T_dict, clusters):
 
 #############################################################################3#
 
-def tanimoto_vec(candidate_ff, set_ff, non0stdev):
-# This is just a wrapper for dis.to.kb, but maps the output: [10000,0] -> [0,1]
-
-    T = dissimilarity_to_KB(candidate_ff, set_ff, non0stdev)
+def tanimoto_dict(candidate_ff, frag_binding_set, non0stdev):
+# This is just a wrapper for dis.to.kb, but maps the output: [10000,0] -> [0,1] and returns an ID-keyed dictionary
+    
+    set_ff_matrix = np.asmatrix([micro_ff for micro_ff in frag_binding_set.values()])
+    # print set_ff_matrix
+    T = dissimilarity_to_KB(candidate_ff, set_ff_matrix, non0stdev)
     T = T.astype(float)
     T = (10000 - T)/10000
+    print '%d scores calculated.' % (len(T))
+    print 'min \t mean \t max'
+    print '%.3f \t %.3f \t %.3f' % (min(T), np.mean(T), max(T))
+    # make a labeled dictionary that refers to resatm IDs
+    T_dict = {frag_binding_set.keys()[i] : T[i] for i in range(len(T))}
 
-    return T
+    return T_dict
 
 #############################################################################3#
 
