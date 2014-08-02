@@ -19,7 +19,9 @@ def main(querry_frag_string):
             if querry_frag_num in fraglist:
                 print microenvironment_num
                 microenvironment_list.append(microenvironment_num)
-        micros_who_bind_querry[resatm] = microenvironment_list
+        if microenvironment_list:
+            # Only create an entry if there are resatms of the type that bind the fragment
+            micros_who_bind_querry[resatm] = set(microenvironment_list)
 
 ### STORE THE FRAGMENT-BINDING SET ### 
 
@@ -31,11 +33,11 @@ def main(querry_frag_string):
     outfile_pvar.close()
 
 ### WRITE TO CSV FILE ###
-
-    outfile_txt = outfile + '.txt'
-    outfile_txt = open(outfile_txt, 'w')
-    outfile_txt.write(str(micros_who_bind_querry))
-    outfile_txt.close()
+#
+#    outfile_txt = outfile + '.txt'
+#    outfile_txt = open(outfile_txt, 'w')
+#    outfile_txt.write(str(micros_who_bind_querry))
+#    outfile_txt.close()
 
 #note that in these files, a reference to microenv #0 means line #1, etc. Everything starts from 0.
 
