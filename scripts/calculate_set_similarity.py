@@ -23,13 +23,17 @@ def main(querry_ID_string, test_resatms=[], test_num=0):
 
 #############################################################################3#
 
-def extra_set_sim(micros_who_bind_querry, test_resatms = [], test_num = 0):
+def intra_set_sim(micros_who_bind_querry, test_resatms = [], test_num = 0):
 ### micros_who_bind_querry is a dictionary with residue atom types as keys 
 ### and lists of the line numbers of all that type of residue that are known 
 ### to bind the fragment as values
 
+    print 'CALCULATING SET INCLUSION FOR FRAG-BINDING MICRO-ENVIRONMENTS (EXPERIMENT)'
+
     if test_resatms:
+        print 'Checking the requested microenvironment types'
         resatms = [resatm for resatm in test_resatms if resatm in micros_who_bind_querry.keys()]
+        print 'Will calculate scores for: \n%s' % (str(resatms))
     else:
         resatms = micros_who_bind_querry.keys()
 
@@ -39,9 +43,61 @@ def extra_set_sim(micros_who_bind_querry, test_resatms = [], test_num = 0):
     for resatm in resatms:
         
         # Prepare the data for this resatm type
+        print 'PRE-PROCESSING DATA FOR CALCULATION\n'
         frag_binding_ff_dict, non0stdev, resatm_clusters, resatmKB = (
             prep_set_data(resatm, micros_who_bind_querry[resatm]))
 
+        print 'DETERMINING CANDIDATE SET\n'
+        # Determine the candidates (drawn from non-binding set) to compare to the frag binding set
+        if test_num != 0:
+            # Determine the number of candidates to test
+            true_test_num = min(test_num, len(frag_binding_ff_dict))
+            # Grab a random subset of these micro IDs to be candidates
+            candidate_ID_set = random.sample(frag_binding_ff_dict.keys(), true_test_num)
+            # Generate a dictionary of ID# : ff_vector for the candidate microenvironments
+            candidate_ff_dict = {candidate_ID : frag_binding_ff_dict[candidate_ID] for candidate_ID in candidate_ID_set}
+            print 'Will test the inclusion of %d candidates\n' % (len(candidate_ff_dict))
+        else:
+            candidate_ff_dict = {candidate_ID : resatmKB[candidate_ID] for candidate_ID in nonbinding_ID_set} 
+            print 'Will test the inclusion of entire frag-binding set (%d candidates)' % (len(candidate_ff_dict))
+        
+        # Calculate the inclusion scores of all candidates
+        print 'CALCULATING INCLUSION SCORES FOR ALL CANDIDATES\n'
+        J_list_resatm = (
+            compare_candidates_to_binding_set(candidate_ff_dict, frag_binding_ff_dict, non0stdev, resatm_clusters))
+        
+        print '\n\n %d set inclusion scores calculated for %s' % (len(J_list_resatm), resatm)
+        J_all_resatms[resatm] = J_list_resatm
+         
+    return J_all_resatms
+
+#############################################################################3#
+
+def extra_set_sim(micros_who_bind_querry, test_resatms = [], test_num = 0):
+### micros_who_bind_querry is a dictionary with residue atom types as keys 
+### and lists of the line numbers of all that type of residue that are known 
+### to bind the fragment as values
+
+    print 'CALCULATING SET INCLUSION FOR NON-BINDING MICRO-ENVIRONMENTS (CONTROL)'
+
+    if test_resatms:
+        print 'Checking the requested microenvironment types'
+        resatms = [resatm for resatm in test_resatms if resatm in micros_who_bind_querry.keys()]
+        print 'Will calculate scores for: \n%s' % (str(resatms))
+    else:
+        resatms = micros_who_bind_querry.keys()
+
+    # initialize the set inclusion score resatm dictionary
+    J_all_resatms = {}
+
+    for resatm in resatms:
+        
+        # Prepare the data for this resatm type
+        print 'PRE-PROCESSING DATA FOR CALCULATION\n'
+        frag_binding_ff_dict, non0stdev, resatm_clusters, resatmKB = (
+            prep_set_data(resatm, micros_who_bind_querry[resatm]))
+
+        print 'DETERMINING CANDIDATE SET\n'
         # Find the IDs of all the micros not known to bind the fragment
         nonbinding_ID_set = set([micro_ID for micro_ID in range(len(resatmKB)) 
                                   if micro_ID not in set(frag_binding_ff_dict.keys())])
@@ -53,17 +109,19 @@ def extra_set_sim(micros_who_bind_querry, test_resatms = [], test_num = 0):
             # Grab a random subset of these micro IDs to be candidates
             candidate_ID_set = random.sample(nonbinding_ID_set, true_test_num)
             # Generate a dictionary of ID# : ff_vector for the candidate microenvironments
+            print 'building candidate dictionary'
             candidate_ff_dict = {candidate_ID : resatmKB[candidate_ID] for candidate_ID in candidate_ID_set}
             print 'Will test the inclusion of %d candidates\n' % (len(candidate_ff_dict))
         else:
-            candidate_ff_dict = {candidate_ID : resatmKB[candidate_ID] for candidate_ID in nonbinding_ID_set 
+            candidate_ff_dict = {candidate_ID : resatmKB[candidate_ID] for candidate_ID in nonbinding_ID_set} 
             print 'Will test the inclusion of entire frag-binding set (%d candidates)' % (len(candidate_ff_dict))
         
         # Calculate the inclusion scores of all candidates
+        print 'CALCULATING INCLUSION SCORES FOR ALL CANDIDATES\n'
         J_list_resatm = (
             compare_candidates_to_binding_set(candidate_ff_dict, frag_binding_ff_dict, non0stdev, resatm_clusters))
         
-        print '\n\n %d set inclusion scores calculated for %s' % (len(J_vec), resatm)
+        print '\n\n %d set inclusion scores calculated for %s' % (len(J_list_resatm), resatm)
         J_all_resatms[resatm] = J_list_resatm
          
     return J_all_resatms
@@ -93,7 +151,8 @@ def prep_set_data(resatm, frag_binding_ID_set):
         # Pull the indices of non-zero standard deviation features
         non0stdev_index = [index for index, element in enumerate(stdev) if element != 0]
         # Filter the KB features (columns) for constant features and save the result as a list of lists
-        resatmKB = resatmKB[:,non0stdev_index].aslist()
+        print 'matrix to list happening...\n'
+        resatmKB = resatmKB[:,non0stdev_index].tolist()
         # Get the standard deviations of all variant featurs
         non0stdev = stdev[non0stdev_index]
         
@@ -108,7 +167,7 @@ def prep_set_data(resatm, frag_binding_ID_set):
 #############################################################################3#
 
 
-def compare_candidates_to_binding_set(candidate_ff_dict, frag_binding_ff_dict, non0stdev, resatm_clusters)
+def compare_candidates_to_binding_set(candidate_ff_dict, frag_binding_ff_dict, non0stdev, resatm_clusters):
 
         # Initialize the set inclusion score vector      
         J_vec = []
@@ -136,86 +195,6 @@ def compare_candidates_to_binding_set(candidate_ff_dict, frag_binding_ff_dict, n
 
         return J_vec
 
-#############################################################################3#
-
-def intra_set_sim(micros_who_bind_querry, test_resatms = [], test_num = 0):
-### micros_who_bind_querry is a dictionary with residue atom types as keys 
-### and lists of the line numbers of all that type of residue that are known 
-### to bind the fragment as values
-
-    if test_resatms:
-        resatms = test_resatms
-    else:
-        resatms = micros_who_bind_querry.keys()
-
-    # initialize the set inclusion score resatm dictionary
-    J_all_resatms = {}
-
-    for resatm in resatms:
-        print '\n\n########################### %s ################################\n' % (resatm)
-
-        # Load the clusters for the type
-        print 'Loading microenvironment cluster set for %s...' % (resatm)
-        resatm_clusters = load_resatm_clusters(resatm)
-        print '%d microenvironment cluster mappings loaded.\n' % (len(resatm_clusters))
-        
-        # Load ff vectors for all micros of the type resatm
-        print 'Loading knowledgebase FragFEATURE vectors for %s...' % (resatm)
-        resatmKB = load_resatm_KB_prop(resatm)
-        print '%d microenvironment FragFEATURE vectors loaded.\n' % (len(resatmKB))
-        
-        # Load the querry-binding set for the resatm type
-        print 'Loading querry fragment binding set for %s...' % (resatm)
-        resatm_ID_set = micros_who_bind_querry[resatm]
-        print '%d querry-binding microenvironments loaded.\n' % (len(resatm_ID_set))
-        
-        # Load the pre-calculated standard deviation to use for bit conversion
-        stdev = load_resatm_stdev(resatm)
-        
-        # Remove the vectors for the micros that don't bind our querry fragment
-        # And just keep the non-zero variance features
-        print 'Subsetting FragFEATURE knowledgebase for fragment-binding microenvironments...'
-        frag_binding_ff_dict =({micro_ID : 
-                            resatmKB[micro_ID, stdev!=0].ravel().tolist()[0] 
-                            for micro_ID in resatm_ID_set})
-        print '%d relevant FragFEATURE vectors retrieved.\n' % (len(frag_binding_ff_dict))
-        non0stdev = stdev[stdev != 0]
-        
-        # Determine the candidates to compare to the frag binding set
-        if test_num != 0:
-            # only test a subset of candidates against the entire set
-            candidate_ID_set = random.sample(resatm_ID_set, min(test_num, len(resatm_ID_set)))
-            candidate_ff_dict = {candidate_ID : frag_binding_ff_dict[candidate_ID] for candidate_ID in candidate_ID_set}
-            print 'Will test the inclusion of %d candidates\n' % (len(candidate_ff_dict))
-        else:
-            candidate_ff_dict = frag_binding_ff_dict
-            print 'Will test the inclusion of entire frag-binding set (%d candidates)' % (len(candidate_ff_dict))
-        
-        # Initialize the set inclusion score vector      
-        J_vec = []
-
-        for candidate_ID, candidate_ff in candidate_ff_dict.iteritems():
-            print '--------------------- %s : %d ---------------------\n' % (resatm, candidate_ID)
-            # Calculate dissimilarity to Residue.Atom knowledge base (KB)
-            print 'Calculating Tanimoto scores for microenvironment %d...' % (candidate_ID)
-            T_dict = tanimoto_dict(candidate_ff, frag_binding_ff_dict, non0stdev)
-            # remove the (trivially=1) candidate "self-similarity" score
-            del T_dict[candidate_ID]
-            # Filter the vector for homology
-            print 'Filtering the scores for homology...'
-            T_filtered = homo_filter(T_dict, resatm_clusters)
-            print 'Returned %d non-homologous scores.\n' % (len(T_filtered))
-            print 'min \t mean \t max'
-            print '%.3f \t %.3f \t %.3f\n' % (min(T_filtered), np.mean(T_filtered), max(T_filtered))
-            # Calculate J-score (set buddy score)
-            print 'Calculating set inclusion score...' 
-            J_vec.append(set_score(T_filtered))
-            print 'J_%d = %.2f\n' % (candidate_ID, J_vec[-1])
-
-        print '\n\n %d set inclusion scores calculated for %s' % (len(J_vec), resatm)
-        J_all_resatms[resatm] = J_vec
-
-    return J_all_resatms
 
 #############################################################################3#
 
