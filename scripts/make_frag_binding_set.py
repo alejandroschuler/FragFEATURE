@@ -21,7 +21,7 @@ def main(querry_frag_string):
                 microenvironment_list.append(microenvironment_num)
         if microenvironment_list:
             # Only create an entry if there are resatms of the type that bind the fragment
-            micros_who_bind_querry[resatm] = set(microenvironment_list)
+            micros_who_bind_querry[resatm] = microenvironment_list
 
 ### STORE THE FRAGMENT-BINDING SET ### 
 
