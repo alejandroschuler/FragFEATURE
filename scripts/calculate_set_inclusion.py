@@ -12,6 +12,8 @@ def set_inclusion(querry_ID_string, test_resatms = [], test_num = 0):
 ### and lists of the line numbers of all that type of residue that are known 
 ### to bind the fragment as values
 
+    random.seed(786914)
+
     infile = '%s/micros_who_bind_%s.pvar' % (KB_HOME, querry_ID_string)    
     infile = open(infile, 'r')
     micros_who_bind_querry = pickle.load(infile)
@@ -48,7 +50,7 @@ def set_inclusion(querry_ID_string, test_resatms = [], test_num = 0):
             print 'Will test the inclusion of %d candidates\n' % (true_test_num)
         else:
             intra_candidate_IDs = frag_binding_IDs
-            extra_candidate_IDs = nonbinding_IDs
+            extra_candidate_IDs = random.sample(nonbinding_IDs, len(frag_binding_IDs))
             print 'Will test the inclusion of all micros'
         
         # Calculate the inclusion scores of all candidates
