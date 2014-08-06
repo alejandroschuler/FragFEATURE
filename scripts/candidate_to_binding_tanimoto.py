@@ -1,20 +1,23 @@
 import cPickle as pickle
-import numpy  as np
-import scipy.misc as sci
+import os
 import random
 from load_datafiles import load_resatm_KB_prop, load_resatm_stdev
 from supportingcode import dissimilarity_to_KB
 from load_directorypaths import *
-from set_inclusion_core import *
 
-def set_inclusion(querry_ID_string, test_resatms = [], test_num = 0):
+from candidate_to_binding_tanimoto_core import *
+
+def main(querry_ID, test_resatms = [], test_num = 0):
 ### micros_who_bind_querry is a dictionary with residue atom types as keys 
 ### and lists of the line numbers of all that type of residue that are known 
 ### to bind the fragment as values
 
     random.seed(786914)
 
-    infile = '%s/micros_who_bind_%s.pvar' % (KB_HOME, querry_ID_string)    
+    querry_ID_string = str(querry_ID)
+    fragdir = KB_HOME + '/f' + querry_ID_string
+
+    infile = fragdir + '/binding_list.pvar'  
     infile = open(infile, 'r')
     micros_who_bind_querry = pickle.load(infile)
 
@@ -22,13 +25,13 @@ def set_inclusion(querry_ID_string, test_resatms = [], test_num = 0):
     if test_resatms:
         print '\n\nChecking the requested microenvironment types'
         resatms = [resatm for resatm in test_resatms if resatm in micros_who_bind_querry.keys()]
-        print 'Will calculate scores for: \n%s\n\n' % (str(resatms))
     else:
         resatms = micros_who_bind_querry.keys()
+    resatms = sorted(resatms)
+    print 'Will calculate scores for: \n%s\n\n' % (str(resatms))
 
-    # initialize the set inclusion score resatm dictionary
-    intra_J_all_resatms = {}
-    extra_J_all_resatms = {}
+    # initialize the Tanimoto score resatm dictionary
+    T = dict.fromkeys(['intra','extra'])
 
     for resatm in resatms:
         
@@ -55,16 +58,14 @@ def set_inclusion(querry_ID_string, test_resatms = [], test_num = 0):
         
         # Calculate the inclusion scores of all candidates
         print 'CALCULATING INCLUSION SCORES FOR ALL CANDIDATES\n'
-        J_list_resatm = compare_candidates_to_binding_set(
-            intra_candidate_IDs, frag_binding_IDs, HomoFil, TanCalc)
-        intra_J_all_resatms[resatm] = J_list_resatm
+        T['intra'] = tanimoto_matrix(intra_candidate_IDs, frag_binding_IDs, HomoFil, TanCalc, resatm)
+        T['extra'] = tanimoto_matrix(extra_candidate_IDs, frag_binding_IDs, HomoFil, TanCalc, resatm)
 
-        J_list_resatm = compare_candidates_to_binding_set(
-            extra_candidate_IDs, frag_binding_IDs, HomoFil, TanCalc)
-        extra_J_all_resatms[resatm] = J_list_resatm
+        outfile = '%s/%s_tanimotos_%dN.pvar' % (fragdir, resatm, true_test_num)
+        outfile = open(outfile, 'w')
+        pickle.dump(T, outfile)
+        outfile.close()
 
-#    outfile = '%s/set_inclusion_scores_%s' %(KB_HOME, querry_ID_string)
-#    outfile = open(outfile, 'w')
-#    pickle.dump((J_intra,J_extra), outfile)
-
-    return (intra_J_all_resatms, extra_J_all_resatms)
+if __name__ == "__main__":
+    import sys
+    main(sys.argv[1], )

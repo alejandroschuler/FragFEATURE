@@ -1,28 +1,39 @@
 import numpy as np
 import cPickle as pickle
 
-def main():
+def main(filename):
     from microenvironment_types import types
-    mfl = 'j_f8027_p5k4.pvar'
-    mfl = open(mfl, 'r')
-    J = JStats(pickle.load(mfl))
-    print 'From file: %s' % (mfl)
+    Jobj = JCalculator(filename)
     for resatm in types:
         print '\n-------------------------- %s ------------------------' % (resatm)
-        B_dist = J.res_summary(resatm)
+        B_dist = Jobj.res_summary(resatm)
 
-class JStats:
+class JCalculator:
     
-    def __init__(self, Js):
-        if type(Js) is str:
+    def __init__(self, T_var):
+        if type(T_var) is str:
             # Js will be the name of the file where the vars are picled
-            self.intra, self.extra = pickle.load(Js)
-        elif type(Js) is tuple:
-            self.intra, self.extra = Js
-            
+            print 'From file: %s' % (T_var)
+            T_file = open(T_var, 'r')
+            T_dict = pickle.load(T_file)
+        else:
+            T_dict = T_var   
+
+        self.J = {resatm : dict.fromkeys(['intra','extra']) for resatm in T_dict.keys()}   
+        for resatm in T_dict.keys():
+             self.J[resatm]['intra'] = self.set_score(T_dict[resatm]['intra'])
+             self.J[resatm]['extra'] = self.set_score(T_dict[resatm]['extra'])
+                       
+    def set_score(self, T):
+        p = 5
+        k = 4
+        J = np.sum(np.abs(T)**p, axis=-1)**k
+    
+        return J
+
     def res_summary(self, resatm):
-        intra_sm = SummaryObj(self.intra[resatm])
-        extra_sm = SummaryObj(self.extra[resatm])
+        intra_sm = SummaryObj(self.J[resatm]['intra'])
+        extra_sm = SummaryObj(self.J[resatm]['extra'])
        
         print '\nSummary for Intra-Binding-Set Inclusion Scores' 
         intra_sm.print_summary()
@@ -34,8 +45,8 @@ class JStats:
         
         N = intra_sm.N
         bins = np.linspace(min_j, max_j, 20)
-        intra_hist, bins = np.histogram(self.intra[resatm], bins)
-        extra_hist, bins = np.histogram(self.extra[resatm], bins)
+        intra_hist, bins = np.histogram(self.J[resatm]['intra'], bins)
+        extra_hist, bins = np.histogram(self.J[resatm]['extra'], bins)
         #print '\nbins:\t\t%s' % (str(bins))
         print '\nHistogram Values'
         print 'intra:\t%s' % (str(intra_hist))
@@ -64,4 +75,5 @@ class SummaryObj:
             self.min, self.mean, self.max, self.std, self.N)
 
 if __name__ == '__main__':
-    main()
+    import sys
+    main(sys.argv[0])

@@ -4,7 +4,6 @@ import scipy.misc as sci
 from load_datafiles import load_resatm_KB_prop, load_resatm_stdev
 from supportingcode import dissimilarity_to_KB
 from load_directorypaths import *
-from set_inclusion_function import *
 
 #############################################################################3#
 
@@ -39,33 +38,33 @@ def prep_set_data(resatm, frag_binding_IDs):
 
 #############################################################################3#
 
-def compare_candidates_to_binding_set(candidate_IDs, frag_binding_IDs, HomoFil, TanCalc):
+def tanimoto_matrix(candidate_IDs, frag_binding_IDs, HomoFil, TanCalc, resatm):
 
-        # Initialize the set inclusion score vector      
-        J_vec = []
+    # Initialize the Tanimoto matrix between the candidates and the binding set members    
+    T = [] 
+    N = len(candidate_IDs)
 
-        for candidate_ID in candidate_IDs:
-            print '--------------------- %d ---------------------\n' % (candidate_ID)
-            # Calculate dissimilarity to Residue.Atom knowledge base (KB)
-            print 'Calculating Tanimoto scores for microenvironment %d...' % (candidate_ID)
-            T_dict = TanCalc.score(TanCalc.resatmKB[candidate_ID,:])
-            # remove the (trivially=1) candidate "self-similarity" score, if the candidate is in the binding set
-            try:
-                del T_dict[candidate_ID]
-            except KeyError:
-                pass
-            # Filter the vector for homology
-            print 'Filtering the scores for homology...'
-            T_filtered = HomoFil.filter(T_dict)
-            print 'Returned %d non-homologous scores.\n' % (len(T_filtered))
-            print 'min \t mean \t max'
-            print '%.3f \t %.3f \t %.3f\n' % (min(T_filtered), np.mean(T_filtered), max(T_filtered))
-            # Calculate J-score (set inclusion score)
-            print 'Calculating set inclusion score...' 
-            J_vec.append(set_score(T_filtered))
-            print 'J_%d = %.2f\n' % (candidate_ID, J_vec[-1])
+    for i, candidate_ID in enumerate(candidate_IDs):
+        print '--------------------- %s: %d / %d ---------------------\n' % (resatm, i, N)
+        # Calculate dissimilarity to Residue.Atom knowledge base (KB)
+        print 'Calculating Tanimoto scores for microenvironment %d...' % (candidate_ID)
+        T_dict = TanCalc.score(TanCalc.resatmKB[candidate_ID,:])
+        # remove the (trivially=1) candidate "self-similarity" score, if the candidate is in the binding set
+        try:
+            del T_dict[candidate_ID]
+        except KeyError:
+            pass
+        # Filter the vector for homology
+        print 'Filtering the scores for homology...'
+        T_filtered = HomoFil.filter(T_dict)
+        print 'Returned %d non-homologous scores.\n' % (len(T_filtered))
+        print 'min \t mean \t max'
+        print '%.3f \t %.3f \t %.3f\n' % (min(T_filtered), np.mean(T_filtered), max(T_filtered))
+        
+        T.append(T_filtered)
 
-        return J_vec
+    T = np.asmatrix(T)
+    return T
 
 #############################################################################3#
 
@@ -84,11 +83,11 @@ class HomologyFilter:
             try:
                 cluster_ID = self.clusters_dict[micro_ID]
                 if cluster_ID not in best_score_in_cluster:
-                    # This is the first score analyzed that is from this cluster, so it is the max so far
+                # This is the first score analyzed that is from this cluster, so it is the max so far
                     best_score_in_cluster[cluster_ID] = score
                 else:
-                    # Compare current score to old max, replace old max if new score is better
-                    best_score_in_cluster[cluster_ID] = max(best_score_in_cluster[cluster_ID], score)
+                # Compare current score to old max, replace old max if new score is better
+                    best_score_in_cluster[cluster_ID] = max(best_score_in_cluster[cluster_ID], score)            
             except KeyError: 
                 singletons.append(score)
         T_filtered = best_score_in_cluster.values() + singletons
