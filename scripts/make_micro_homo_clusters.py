@@ -5,7 +5,7 @@ from microenvironment_types import types
 import cPickle as pickle
 
 def main():
-    prot_clusters = load_seqclusterid('95') 
+    prot_clusters = load_seqclusterid('70') 
     print 'File loaded'
     micro_clusters = cluster_micros(prot_clusters)
     for resatm in types:

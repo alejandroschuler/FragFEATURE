@@ -45,25 +45,20 @@ def tanimoto_matrix(candidate_IDs, frag_binding_IDs, HomoFil, TanCalc, resatm):
     N = len(candidate_IDs)
 
     for i, candidate_ID in enumerate(candidate_IDs):
-        print '--------------------- %s: %d / %d ---------------------\n' % (resatm, i, N)
+        print '--------------------- %s: %d / %d ---------------------\n' % (resatm, i+1, N)
         # Calculate dissimilarity to Residue.Atom knowledge base (KB)
         print 'Calculating Tanimoto scores for microenvironment %d...' % (candidate_ID)
         T_dict = TanCalc.score(TanCalc.resatmKB[candidate_ID,:])
-        # remove the (trivially=1) candidate "self-similarity" score, if the candidate is in the binding set
-        try:
-            del T_dict[candidate_ID]
-        except KeyError:
-            pass
         # Filter the vector for homology
         print 'Filtering the scores for homology...'
-        T_filtered = HomoFil.filter(T_dict)
+        T_filtered = HomoFil.filter(T_dict, candidate_ID)
         print 'Returned %d non-homologous scores.\n' % (len(T_filtered))
         print 'min \t mean \t max'
         print '%.3f \t %.3f \t %.3f\n' % (min(T_filtered), np.mean(T_filtered), max(T_filtered))
         
         T.append(T_filtered)
 
-    T = np.asmatrix(T)
+    T = np.asarray(T)
     return T
 
 #############################################################################3#
@@ -73,11 +68,12 @@ class HomologyFilter:
     def __init__(self, clusters_dict):
         self.clusters_dict = clusters_dict
 
-    def filter(self, T_dict):
-        # T_dict is a dictionary--  micro_ID : T(m*,micro(ID))
+    def filter(self, T_dict, candidate_ID):
+        # T_dict is a dictionary--  micro_ID : T(m_*,m_ID)
         # self.clusters is a dictionary-- micro_ID : cluster_ID 
         best_score_in_cluster = {}
-        singletons = []
+        singletons = {}
+        
         # Break up T_dict into disjoint subsets by homology cluster (and the homeless singletons)
         for micro_ID, score in T_dict.iteritems():
             try:
@@ -89,8 +85,25 @@ class HomologyFilter:
                 # Compare current score to old max, replace old max if new score is better
                     best_score_in_cluster[cluster_ID] = max(best_score_in_cluster[cluster_ID], score)            
             except KeyError: 
-                singletons.append(score)
-        T_filtered = best_score_in_cluster.values() + singletons
+                singletons[micro_ID] = score
+        
+        # Filter for any microenvironment in the same cluster as the candidate
+        # Should also catch the self-similarity score of non-singletons (for binding set comparison)
+        try:
+            del best_score_in_cluster[self.clusters_dict[candidate_ID]]        
+        except KeyError:
+            # Check if it's a singleton binder or a non-binder
+            if candidate_ID not in T_dict.keys():
+                # Must be a non-binding candidate with no homologs in the binding set
+                # If we don't delete a Tanimoto, this candidate will have one extra
+                # So just delete the worst overall score- will have minimal effect
+                del best_score_in_cluster[min(best_score_in_cluster, key=best_score_in_cluster.get)]
+            elif candidate_ID in singletons.keys():
+                # If the candidate is a singleton and in the binding set, this will catch it
+                # Will remove the self-similarity score
+                del singletons[candidate_ID]
+        
+        T_filtered = best_score_in_cluster.values() + singletons.values()
 
         return T_filtered
 

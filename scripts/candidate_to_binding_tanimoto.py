@@ -1,21 +1,19 @@
 import cPickle as pickle
 import os
 import random
-from load_datafiles import load_resatm_KB_prop, load_resatm_stdev
 from supportingcode import dissimilarity_to_KB
 from load_directorypaths import *
 
 from candidate_to_binding_tanimoto_core import *
 
-def main(querry_ID, test_resatms = [], test_num = 0):
+def main(frag_ID, test_resatms = [], test_num = 0):
 ### micros_who_bind_querry is a dictionary with residue atom types as keys 
 ### and lists of the line numbers of all that type of residue that are known 
 ### to bind the fragment as values
 
-    random.seed(786914)
+   # random.seed(786914)
 
-    querry_ID_string = str(querry_ID)
-    fragdir = KB_HOME + '/f' + querry_ID_string
+    fragdir = KB_HOME + '/f' + str(frag_ID)
 
     infile = fragdir + '/binding_list.pvar'  
     infile = open(infile, 'r')
@@ -45,27 +43,36 @@ def main(querry_ID, test_resatms = [], test_num = 0):
         # Determine the candidates (drawn from non-binding set) to compare to the frag binding set
         print 'DETERMINING CANDIDATE SETS\n'
         if test_num != 0:
-            # Determine the number of candidates to test
+            # Determine the number of candidates to test in each group
             true_test_num = min([test_num, len(frag_binding_IDs), len(nonbinding_IDs)])
             # Grab a random subset of these micro IDs to be candidates
             intra_candidate_IDs = random.sample(frag_binding_IDs, true_test_num)
             extra_candidate_IDs = random.sample(nonbinding_IDs, true_test_num)
+            test_type = 'partial'
             print 'Will test the inclusion of %d candidates\n' % (true_test_num)
         else:
+            true_test_num = min(2000, len(nonbinding_IDs))
             intra_candidate_IDs = frag_binding_IDs
-            extra_candidate_IDs = random.sample(nonbinding_IDs, len(frag_binding_IDs))
+            extra_candidate_IDs = random.sample(nonbinding_IDs, true_test_num)
+            test_type = 'full'
             print 'Will test the inclusion of all micros'
         
         # Calculate the inclusion scores of all candidates
         print 'CALCULATING INCLUSION SCORES FOR ALL CANDIDATES\n'
-        T['intra'] = tanimoto_matrix(intra_candidate_IDs, frag_binding_IDs, HomoFil, TanCalc, resatm)
-        T['extra'] = tanimoto_matrix(extra_candidate_IDs, frag_binding_IDs, HomoFil, TanCalc, resatm)
+        T_intra = tanimoto_matrix(intra_candidate_IDs, frag_binding_IDs, HomoFil, TanCalc, resatm)
+        T_extra = tanimoto_matrix(extra_candidate_IDs, frag_binding_IDs, HomoFil, TanCalc, resatm)
+        
+        if T_intra.shape[1] != T_extra.shape[1]:
+            print '!!!!!!!!! TANIMOTO MATRICIES NOT CORRECT DIMENSION !!!!!!'
+            import sys
+            sys.exit()
 
-        outfile = '%s/%s_tanimotos_%dN.pvar' % (fragdir, resatm, true_test_num)
-        outfile = open(outfile, 'w')
-        pickle.dump(T, outfile)
-        outfile.close()
+        outfile_intra = '%s/%s_intra_tanimotos_%s.pvar' % (fragdir, resatm, test_type)
+        outfile_extra = '%s/%s_extra_tanimotos_%s.pvar' % (fragdir, resatm, test_type)
+
+        T_intra.dump(outfile_intra)
+        T_extra.dump(outfile_extra)
 
 if __name__ == "__main__":
     import sys
-    main(sys.argv[1], )
+    main(sys.argv[1])

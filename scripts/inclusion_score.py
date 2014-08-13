@@ -1,63 +1,77 @@
 import numpy as np
 import cPickle as pickle
+from load_directorypaths import *
+import glob
 
-def main(filename):
-    from microenvironment_types import types
-    Jobj = JCalculator(filename)
-    for resatm in types:
-        print '\n-------------------------- %s ------------------------' % (resatm)
-        B_dist = Jobj.res_summary(resatm)
+def main(frag_ID):
+    from operator import methodcaller
 
+    fragdir = KB_HOME + '/f' + str(frag_ID)    
+    file_list = glob.glob(fragdir + '/*tanimotos_full*')
+    file_list = map(methodcaller("split", "/"), file_list)
+    file_list = [file_name[-1] for file_name in file_list]
+    file_info = map(methodcaller("split", "_"), file_list)
+    resatms = set([file_datum[0] for file_datum in file_info]) 
+   
+    print resatms 
+    J = dict.fromkeys(resatms)
+    outlist = []
+    for resatm in resatms:
+        T_intra_file = fragdir + '/' + resatm + '_intra_tanimotos_full.pvar'
+        T_extra_file = fragdir + '/' + resatm + '_extra_tanimotos_full.pvar'
+        J[resatm] = JCalculator(T_intra_file, T_extra_file)
+        J[resatm].res_summary()
+        for sample in J[resatm].intra:
+            outlist.append(resatm + ',intra,' + str(sample))
+        for sample in J[resatm].extra:   
+            outlist.append(resatm + ',extra,' + str(sample))
+        
+    outfile = fragdir + '/J_' + frag_ID + '.txt'
+    outfile = open(outfile, 'w')
+    for item in outlist:
+        print>>outfile, item
+    
 class JCalculator:
     
-    def __init__(self, T_var):
-        if type(T_var) is str:
-            # Js will be the name of the file where the vars are picled
-            print 'From file: %s' % (T_var)
-            T_file = open(T_var, 'r')
-            T_dict = pickle.load(T_file)
-        else:
-            T_dict = T_var   
-
-        self.J = {resatm : dict.fromkeys(['intra','extra']) for resatm in T_dict.keys()}   
-        for resatm in T_dict.keys():
-             self.J[resatm]['intra'] = self.set_score(T_dict[resatm]['intra'])
-             self.J[resatm]['extra'] = self.set_score(T_dict[resatm]['extra'])
-                       
-    def set_score(self, T):
-        p = 5
-        k = 4
-        J = np.sum(np.abs(T)**p, axis=-1)**k
-    
-        return J
-
-    def res_summary(self, resatm):
-        intra_sm = SummaryObj(self.J[resatm]['intra'])
-        extra_sm = SummaryObj(self.J[resatm]['extra'])
+    def __init__(self, T_intra_file, T_extra_file):
+        print 'From files:\n%s\n%s' % (T_intra_file, T_extra_file)
+        T_intra = np.load(T_intra_file)
+        T_extra = np.load(T_extra_file)
        
-        print '\nSummary for Intra-Binding-Set Inclusion Scores' 
+        self.intra = self.set_score(T_intra)
+        self.extra = self.set_score(T_extra)
+                              
+    def set_score(self, T):
+        p, k = 100, 0.01
+        J = np.sum(T ** p, axis=-1)  ** k
+        
+        return J
+                       
+    def res_summary(self):
+        intra_sm = SummaryObj(self.intra)
+        extra_sm = SummaryObj(self.extra)
+
+        print '\nSummary for Intra-Binding-Set Inclusion Scores'
         intra_sm.print_summary()
-        print '\nSummary for Extra-Binding-Set Inclusion Scores' 
+        print '\nSummary for Extra-Binding-Set Inclusion Scores'
         extra_sm.print_summary()
         
         min_j = min(intra_sm.min, extra_sm.min)
         max_j = max(intra_sm.max, extra_sm.max)
         
-        N = intra_sm.N
-        bins = np.linspace(min_j, max_j, 20)
-        intra_hist, bins = np.histogram(self.J[resatm]['intra'], bins)
-        extra_hist, bins = np.histogram(self.J[resatm]['extra'], bins)
+        bins = np.linspace(min_j, max_j, 40)
+        intra_hist, bins = np.histogram(self.intra, bins)
+        extra_hist, bins = np.histogram(self.extra, bins)
         #print '\nbins:\t\t%s' % (str(bins))
+        intra_freq, extra_freq = intra_hist.astype(float)/intra_sm.N, extra_hist.astype(float)/extra_sm.N
         print '\nHistogram Values'
         print 'intra:\t%s' % (str(intra_hist))
         print 'extra:\t%s' % (str(extra_hist))
 
-        B_coef = sum(map(lambda x,y: np.sqrt(x*y)/N, intra_hist, extra_hist))
+        B_coef = sum(map(lambda x,y: np.sqrt(x*y), intra_freq, extra_freq))
         print '\nBhattacharyya Coefficient: %.2f' % (B_coef)
         B_dist = -np.log(B_coef)
         print 'Bhattacharyya Distance: %.2f' % (B_dist)
-
-        return B_dist
 
 class SummaryObj:
 
@@ -76,4 +90,4 @@ class SummaryObj:
 
 if __name__ == '__main__':
     import sys
-    main(sys.argv[0])
+    main(sys.argv[1])
