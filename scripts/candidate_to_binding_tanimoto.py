@@ -51,7 +51,7 @@ def main(frag_ID, test_resatms = [], test_num = 0):
             test_type = 'partial'
             print 'Will test the inclusion of %d candidates\n' % (true_test_num)
         else:
-            true_test_num = min(2000, len(nonbinding_IDs))
+            true_test_num = min(100000, 10*len(frag_binding_IDs), len(nonbinding_IDs))
             intra_candidate_IDs = frag_binding_IDs
             extra_candidate_IDs = random.sample(nonbinding_IDs, true_test_num)
             test_type = 'full'
