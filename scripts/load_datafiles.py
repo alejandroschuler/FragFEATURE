@@ -87,11 +87,17 @@ def load_resatm_KB_ann(resatm):
 
 ###############################################################################
 # Load ff vector property information for RES.ATM
-def load_resatm_KB_prop(resatm):
+def load_resatm_KB_prop(resatm, filter_flag=1):
     infile = "%s/%s/%s.ALL.property.pvar" %(KB_HOME, resatm, resatm)
     infile = open(infile, 'r')
     ffdataKB = pickle.load(infile)
     infile.close()
+    if filter_flag:
+        stdev = load_resatm_stdev(resatm)
+        # Pull the indices of non-zero standard deviation features
+        non0stdev_index = [index for index, element in enumerate(stdev) if element != 0]
+        ffdataKB = ffdataKB[:,non0stdev_index]
+
     return ffdataKB
 
 
@@ -184,3 +190,12 @@ def load_fragment_mapping():
     fragment_mapping = pickle.load(infile)
     infile.close()
     return fragment_mapping
+
+###############################################################################
+def load_frag_binding(frag_ID):
+    fragdir = KB_HOME + '/f' + str(frag_ID)
+    infile = fragdir + '/binding_list.pvar'
+    infile = open(infile, 'r')
+    micros_who_bind_querry = pickle.load(infile)
+    infile.close()
+    return micros_who_bind_querry
